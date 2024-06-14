@@ -1,0 +1,28 @@
+﻿@page "/server-interactive"
+@rendermode InteractiveServer
+
+<PageTitle>Testing Sever Mode Interactive</PageTitle>
+
+
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currenter</p>
+
+<button class="btn btn-primary" @onclick="OnStart">Click me</button>
+
+@code {
+    private int currenter = 0;
+
+    private async Task OnStart()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            ++currenter;
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(1000);
+        }
+
+    }
+}

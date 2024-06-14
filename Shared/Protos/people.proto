@@ -1,0 +1,38 @@
+﻿syntax="proto3";
+
+option csharp_namespace = "Shared.Protos";
+
+package PeoplePackage;
+
+message Child {
+	string firstName=1;
+}
+
+message CreatePersonRequest {
+  string firstName=1;
+  string lastName=2;
+  repeated Child children=3;
+}
+
+message CreatePersonResponse {
+  int32  id=1;
+  string firstName=2;
+  string lastName=3;
+  string childs=4;
+}
+
+message Empty{}
+message PeopleModel{
+  int32  id=1;
+  string firstName=2;
+  string lastName=3;
+}
+message GetAllPeopleResponse{
+	repeated PeopleModel peoples=1;
+}
+
+service PeopleService{
+  rpc Create(CreatePersonRequest) returns (CreatePersonResponse);
+  rpc GetAllPeoples(Empty) returns (GetAllPeopleResponse);
+}
+

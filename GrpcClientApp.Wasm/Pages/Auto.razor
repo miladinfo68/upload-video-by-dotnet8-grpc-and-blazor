@@ -1,0 +1,24 @@
+﻿@page "/auto-interactive"
+
+@rendermode InteractiveAuto 
+
+<PageTitle>Testing Interactive Auto Mode</PageTitle>
+
+<h3>Testing Interactive Auto Mode</h3>
+<h5>this is wasm mode plus signalr connection for first load </h5>
+<h5>in wasm mode the whole page first downloaded to browser then loaded, 
+    in auto mode during download in first load, browser loaded the content
+</h5>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}

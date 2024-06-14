@@ -1,0 +1,57 @@
+﻿@page "/upload-file"
+
+@* @attribute [StreamRendering(true)] *@
+
+@rendermode InteractiveServer
+
+@inject CientFileUploadService FileUploadService
+@inject IWebHostEnvironment WebHostEnvironment
+
+<h3>Upload File</h3>
+
+<InputFile OnChange="HandleUploadFile" />
+
+<div class="progress mt-1">
+    <div class="progress-bar"
+         role="progressbar"
+         aria-valuenow="@_progress"
+         aria-valuemin="0"
+         aria-valuemax="100" style="width: @_progress%;">
+        @_progress%
+    </div>
+</div>
+
+
+@code {
+    private int _progress = 0;
+    private int _chunkSize = AppConstants.CHUNK_SIZE_2MB;
+
+    private async Task HandleUploadFile(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            if (!(e.FileCount > 0)) await Task.CompletedTask;
+
+            var file = e.File;
+            await using var stream = file.OpenReadStream(file.Size);
+            if (file.Size <= AppConstants.CHUNK_SIZE_1MB)
+            {
+                _chunkSize = AppConstants.CHUNK_SIZE_1MB;
+            }
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, "files", file.Name);
+            await FileUploadService.UploadFileAsync(stream, _chunkSize, filePath, UpdateProgressbar);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            throw;
+        }
+
+    }
+
+    private void UpdateProgressbar(int progress)
+    {
+        _progress = progress;
+        StateHasChanged();
+    }
+}

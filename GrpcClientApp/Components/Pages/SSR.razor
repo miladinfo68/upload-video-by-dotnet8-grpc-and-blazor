@@ -1,0 +1,90 @@
+﻿@page "/ssr"
+
+<PageTitle>Testing Server Side Rendering Mode (SSR) </PageTitle>
+
+<h3>Testing Server Side Rendering Mode (SSR): @indx </h3>
+
+<button @onclick="HandleClickNotWork">SSR Not Work Hear</button>
+<br />
+<br />
+
+<EditForm Model="Model" method="post" OnSubmit="HandleSubmit" FormName="frmPerson" Enhance=true>
+    <InputText @bind-Value=Model!.FirstName />
+    <InputText @bind-Value=Model.LastName />
+    <button type="submit">Send</button>
+</EditForm>
+
+<br />
+
+<EditForm Model=StarshipModel method="post" OnSubmit="HandleSubmit" FormName="frmStarship" data-enhance>
+    <InputText @bind-Value=StarshipModel!.Id />
+    <button type="submit">Send</button>
+</EditForm>
+
+@code {
+
+
+    public class SsrFormModel
+    {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+    }
+
+    public class Starship
+    {
+        public string? Id { get; set; }
+    }
+
+    [SupplyParameterFromForm]
+    public SsrFormModel? Model { get; set; }
+
+    [SupplyParameterFromForm]
+    public Starship? StarshipModel { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string Qry { get; set; }
+
+
+    protected override void OnParametersSet()
+    {
+       //take Qry as a query string from url
+    }
+
+
+
+    int indx = 0;
+
+    [CascadingParameter] public HttpContext HttpCtx { get; set; }
+    protected override void OnInitialized()
+    {
+        HttpCtx.Response.Headers.Add("Milad", "Milad");
+
+        Model ??= new();
+        StarshipModel ??= new();
+    }
+
+    //not ganna works 5 times(waits 5 seconds and return the result),
+    //because in ssr mode the whole page render by server and only the 
+    //html result get back to client
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 1; i <= 5; i++)
+        {
+            indx = i;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(1000);
+        }
+    }
+
+    async Task HandleClickNotWork()
+    {
+        await Task.CompletedTask;
+    }
+
+    void HandleSubmit()
+    {
+        var fn = Model.FirstName;
+        var ln = Model.LastName;
+        var id = StarshipModel.Id;
+    }
+}

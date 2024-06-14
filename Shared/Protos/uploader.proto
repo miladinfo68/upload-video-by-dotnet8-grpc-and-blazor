@@ -1,0 +1,27 @@
+﻿syntax="proto3";
+import "google/protobuf/wrappers.proto";
+
+option csharp_namespace = "Shared.Protos";
+
+package UploaderPackage;
+
+
+message ChunkRequest {
+  bytes data = 1;
+  int32 chunk_number=2;
+  int32 total_chunks=3;
+  string file_name=4;
+}
+
+message ChunkResponse {
+  bool success = 1;
+  string message = 2;
+  int32 progress=3;
+  int32 chunk_number=4;
+  google.protobuf.BytesValue data = 5;
+}
+
+service UploaderService{
+  rpc UploadChunk(stream ChunkRequest) returns (stream ChunkResponse);
+}
+
