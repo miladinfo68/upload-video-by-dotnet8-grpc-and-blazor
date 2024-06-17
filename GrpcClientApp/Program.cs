@@ -30,12 +30,12 @@ builder.Services.AddSingleton(services =>
     });
 });
 
-builder.Services.AddScoped<CientFileUploadService>();
+builder.Services.AddScoped<ClientVideoService>();
 
 builder.Services.AddScoped(sp =>
 {
     var channel = sp.GetRequiredService<GrpcChannel>();
-    return new UploaderService.UploaderServiceClient(channel);
+    return new VideoService.VideoServiceClient(channel);
 });
 
 

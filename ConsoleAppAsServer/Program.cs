@@ -21,7 +21,7 @@ var server = new Server()
     {
         WelcomeService.BindService(new WelcomeServiceImpl()),
         MathService.BindService(new MathServiceImpl()),
-        UploaderService.BindService(new UploaderServiceImpl()),
+        VideoService.BindService(new VideoServiceImpl()),
         PeopleService.BindService(new PeopleServiceImpl(peopleContext)),
     }
 };
