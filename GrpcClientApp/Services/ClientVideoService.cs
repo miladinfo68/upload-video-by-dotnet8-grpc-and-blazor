@@ -7,29 +7,32 @@ using System.Collections.Generic;
 
 namespace GrpcClientApp.Services;
 
-public class CientFileUploadService
+public class ClientVideoService
 {
     private readonly GrpcChannel _channel;
-    private readonly UploaderService.UploaderServiceClient _client;
-    private ConcurrentDictionary<string, ChunkRequest> _crashedChunks;
-    public CientFileUploadService(GrpcChannel channel)
+    private readonly VideoService.VideoServiceClient _client;
+    private readonly ConcurrentDictionary<string, ChunkRequest> _crashedChunks;
+    public ClientVideoService(GrpcChannel channel)
     {
         _channel ??= channel;
         _crashedChunks ??= new();
-        _client ??= new UploaderService.UploaderServiceClient(channel);
+        _client ??= new VideoService.VideoServiceClient(channel);
     }
 
     public async Task UploadFileAsync(Stream fileStream, int chunkSize, string filePath, Action<int>? callback)
     {
         var totalFileSize = (int)fileStream.Length;
         var totalChunks = (int)Math.Ceiling((double)totalFileSize / chunkSize);
-        var buffer = new byte[chunkSize];
+        int lastChunkSize = (int)(totalFileSize % chunkSize);
+        byte[]? buffer = null ;
         var fileName = filePath.Split('\\').Last();
 
         using var call = _client.UploadChunk();
 
         for (var chunkNumber = 1; chunkNumber <= totalChunks; chunkNumber++)
         {
+            // Adjust buffer size for the last chunk
+            buffer = new byte[chunkNumber == totalChunks ? lastChunkSize : chunkSize];  
             var bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length);
             if (bytesRead == 0) break; // End of file
 
@@ -68,16 +71,19 @@ public class CientFileUploadService
         await call.RequestStream.CompleteAsync();
 
         // Attempt to resend crashed chunks
-        await ResendCrashedChunksAsync();
+        if (!_crashedChunks.IsEmpty)
+        {
+            await ResendCrashedChunksAsync(callback);
+        }
+
     }
 
 
-    private async Task ResendCrashedChunksAsync()
+    private async Task ResendCrashedChunksAsync(Action<int>? callback)
     {
         foreach (var crashedChunk in _crashedChunks)
         {
-            var chunkNumber = crashedChunk.Key;
-            var chunkData = crashedChunk.Value;
+            var chunkInfo = crashedChunk.Value;
 
             // Create a new call for each chunk
             using var call = _client.UploadChunk();
@@ -86,18 +92,24 @@ public class CientFileUploadService
             {
                 await call.RequestStream.WriteAsync(new ChunkRequest
                 {
-                    Data = chunkData.,
-                    ChunkNumber = chunkNumber,
-                    TotalChunks = _crashedChunks.Count, // Update totalChunks based on current count
-                    FileName = _crashedChunks.First().Value.FileName // Assuming all chunks have the same file name
+                    Data = chunkInfo.Data,
+                    ChunkNumber = chunkInfo.ChunkNumber,
+                    TotalChunks = chunkInfo.TotalChunks,
+                    FileName = chunkInfo.FileName
                 });
 
-                // Optionally, wait for a response or check success
+                // Read the response after writing the chunk
+                if (!await call.ResponseStream.MoveNext()) continue;
+                var response = call.ResponseStream.Current;
+                if (response is not null && response.Success)
+                {
+                    callback?.Invoke(response.Progress);
+                }
             }
             catch (RpcException ex)
             {
                 // Log or handle the exception as needed
-                Console.WriteLine($"Failed to resend chunk {chunkNumber}: {ex.Status.Detail}");
+                Console.WriteLine($"Failed to resend chunk {chunkInfo.ChunkNumber}: {ex.Status.Detail}");
             }
         }
     }

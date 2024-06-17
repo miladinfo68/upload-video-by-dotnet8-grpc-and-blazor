@@ -16,7 +16,7 @@ builder.Services.AddGrpc(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-app.MapGrpcService<UploaderServiceImpl>();
+app.MapGrpcService<VideoServiceImpl>();
 
 app.MapGet("/hc", () => "healthy");
 

@@ -3,13 +3,13 @@ using Shared.Protos;
 
 namespace ConsoleAppAsServer.Services;
 
-public class UploaderServiceImpl : UploaderService.UploaderServiceBase
+public class VideoServiceImpl : VideoService.VideoServiceBase
 {
-    public override Task UploadFile(
-        IAsyncStreamReader<FileChunk> requestStream, 
-        IServerStreamWriter<UploadProgress> responseStream, 
+    public override Task UploadChunk(
+        IAsyncStreamReader<ChunkRequest> requestStream, 
+        IServerStreamWriter<ChunkResponse> responseStream, 
         ServerCallContext context)
     {
-        return base.UploadFile(requestStream, responseStream, context);
+        return base.UploadChunk(requestStream, responseStream, context);
     }
 }
