@@ -1,7 +1,31 @@
 using GrpcServerApp.Services;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Shared;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+//builder.WebHost.ConfigureKestrel(options =>
+//{
+//    options.Limits.MaxRequestBodySize = AppConstants.CHUNK_SIZE;
+//});
+
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+
+    options.Limits.MaxRequestBodySize = AppConstants.CHUNK_SIZE_2GB;
+});
+
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = AppConstants.CHUNK_SIZE_2GB;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = AppConstants.CHUNK_SIZE_2GB;
+});
 
 builder.Services.AddGrpc(options =>
 {

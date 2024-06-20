@@ -14,18 +14,122 @@
 <div class="progress mt-1">
     <div class="progress-bar"
          role="progressbar"
-         aria-valuenow="@_progress"
+         aria-valuenow="@_progress.ToString("N0")"
          aria-valuemin="0"
-         aria-valuemax="100" style="width: @_progress%;">
-        @_progress%
+         aria-valuemax="100" style="width: @_progress.ToString("N0")%;">
+        @_progress.ToString("N0")%
     </div>
 </div>
 
 
 @code {
-    private int _progress = 0;
+    private double _progress = 0;
     private int _chunkSize = AppConstants.CHUNK_SIZE_2MB;
 
+    public async Task<byte[]> ReadFully(Stream input, long totalSize)
+    {
+        byte[]? res;
+        try
+        {
+            byte[] buffer = new byte[_chunkSize];
+            long totalRead = 0;
+            int read;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                Memory<byte> memory = new Memory<byte>(buffer);
+                while ((read = await input.ReadAsync(memory.Slice(0, _chunkSize))) > 0)      //solution 1
+                //while ((read = await input.ReadAsync(buffer.AsMemory(0, _chunkSize))) > 0) //solution 2
+                //while ((read = await input.ReadAsync(buffer, 0, buffer.Length)) > 0)       //solution 3
+                {
+                    //await ms.WriteAsync(buffer, 0, read);
+                    await ms.WriteAsync(memory.Slice(0, read));
+                    totalRead += read;
+                    _progress = (totalRead * 100.0 )/ totalSize;
+                    StateHasChanged();
+                }
+                res = ms.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
+        return res;
+
+    }
+
+
+    // public static byte[] ReadFully(Stream input)
+    // {
+    //     byte[] buffer = new byte[input.Length];
+    //     //byte[] buffer = new byte[16 * 1024];
+    //     using (MemoryStream ms = new MemoryStream())
+    //     {
+    //         int read;
+    //         while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+    //         {
+    //             ms.Write(buffer, 0, read);
+    //         }
+    //         return ms.ToArray();
+    //     }
+    // }
+
+
+
+    private async Task HandleUploadFile(InputFileChangeEventArgs e)
+    {
+        if (!(e.FileCount > 0)) await Task.CompletedTask;
+
+        var file = e.File;
+        await using var stream = file.OpenReadStream(file.Size);
+        var fileBytes = stream.Length;
+        var fileData = await ReadFully(stream, fileBytes);
+
+
+
+        await Task.CompletedTask;
+
+        var chunkSize = _chunkSize;
+        var totalChunks = (int)Math.Ceiling(fileBytes / (double)chunkSize);
+        int lastChunkSize = (int)(fileBytes % chunkSize);
+
+        var chunkNumber = 1;
+        int bytesRead = 0;
+
+        var filePath = Path.Combine(WebHostEnvironment.WebRootPath, "files", Path.GetFileNameWithoutExtension(file.Name));
+
+        var chunks = new List<byte[]>();
+
+        byte[] buffer = new byte[chunkNumber == totalChunks ? lastChunkSize : chunkSize];
+
+        var position = 0;
+        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            position += bytesRead;
+            chunks.Add(buffer.Take(bytesRead).ToArray());
+            buffer = new byte[++chunkNumber == totalChunks ? lastChunkSize : chunkSize];
+
+        }
+
+        if (chunks?.Count > 0)
+        {
+            if (!Directory.Exists(filePath))
+            {
+                Directory.CreateDirectory(filePath);
+            }
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                var chunkFilePath = Path.Combine(filePath, $"{(i + 1):D4}{Path.GetExtension(file.Name).ToLowerInvariant()}");
+                await File.WriteAllBytesAsync(chunkFilePath, chunks[i]);
+            }
+        }
+
+    }
+
+
+    /*
     private async Task HandleUploadFile(InputFileChangeEventArgs e)
     {
         try
@@ -33,11 +137,100 @@
             if (!(e.FileCount > 0)) await Task.CompletedTask;
 
             var file = e.File;
-            await using var stream = file.OpenReadStream(file.Size);
-            if (file.Size <= AppConstants.CHUNK_SIZE_1MB)
+            var stream = file.OpenReadStream(file.Size);
+            var fileBytes = stream.Length;
+
+            var chunkSize = Math.Min(128, file.Size);
+            var totalChunks = (int)Math.Ceiling(fileBytes / (double)chunkSize);
+            int lastChunkSize = (int)(fileBytes % chunkSize);
+
+            var chunkNumber = 1;
+            int bytesRead = 0;
+
+            var enlargingFactor = 8 * 1024; //chunkSize:128 * 8 * 1024 = 1MB
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, "files", Path.GetFileNameWithoutExtension(file.Name));
+
+            var chunks = new List<byte[]>();
+            var mergedChunks = new List<byte[]>();
+
+            byte[] buffer = new byte[chunkNumber == totalChunks ? lastChunkSize : chunkSize];
+            //while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
             {
-                _chunkSize = AppConstants.CHUNK_SIZE_1MB;
+                chunks.Add(buffer.Take(bytesRead).ToArray());
+                buffer = new byte[++chunkNumber == totalChunks ? lastChunkSize : chunkSize];
             }
+
+
+            if (chunks?.Count > 0)
+            {
+                var largerChunksCount = Math.Ceiling((decimal)chunks.Count / enlargingFactor);
+                var chunksCountInLastBlock = chunks.Count % enlargingFactor;
+                var index = 0;
+
+                while (index < largerChunksCount)
+                {
+                    var rangeChunks = chunks
+                    .Skip(index * enlargingFactor)
+                    .Take(index == enlargingFactor ? chunksCountInLastBlock : enlargingFactor)
+                    .SelectMany(chk => chk)
+                    .ToArray();
+                    mergedChunks.Add(rangeChunks);
+                    ++index;
+                }
+            }
+
+
+            if (mergedChunks?.Count() > 0)
+            {
+                var chunkNamePath = string.Empty;
+                if (!Directory.Exists(filePath))
+                {
+                    Directory.CreateDirectory(filePath);
+                }
+
+                for (int i = 0; i < mergedChunks.Count(); i++)
+                {
+                    chunkNamePath = Path.Combine(filePath, $"{(i + 1):D4}{Path.GetExtension(file.Name).ToLowerInvariant()}");
+                    if (!File.Exists(chunkNamePath))
+                    {
+                        File.WriteAllBytes(chunkNamePath, mergedChunks.ElementAt(i));
+                    }
+                }
+
+                var mergedAllChunks = mergedChunks.SelectMany(s => s).ToArray();
+
+                chunkNamePath = Path.Combine(filePath,$"main-file{Path.GetExtension(file.Name).ToLowerInvariant()}");
+                if (!File.Exists(chunkNamePath))
+                {
+                    File.WriteAllBytes(chunkNamePath, mergedAllChunks);
+                }
+
+            }
+
+            bool done = true;
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            throw;
+        }
+    }
+
+    */
+
+
+
+    /*
+    private async Task HandleUploadFile(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            if (!(e.FileCount > 0)) await Task.CompletedTask;
+
+            var file = e.File;
+            var stream = file.OpenReadStream(file.Size);
             var filePath = Path.Combine(WebHostEnvironment.WebRootPath, "files", file.Name);
             await FileUploadService.UploadFileAsync(stream, _chunkSize, filePath, UpdateProgressbar);
         }
@@ -46,8 +239,8 @@
             Console.WriteLine(ex);
             throw;
         }
-
     }
+    */
 
     private void UpdateProgressbar(int progress)
     {

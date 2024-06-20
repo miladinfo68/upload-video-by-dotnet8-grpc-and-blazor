@@ -4,6 +4,7 @@ using GrpcClientApp.Services;
 using GrpcClientApp.Wasm.Pages;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Shared;
 using Shared.Protos;
 
@@ -15,18 +16,28 @@ var builder = WebApplication.CreateBuilder(args);
 //    options.Limits.MaxRequestBodySize = AppConstants.CHUNK_SIZE;
 //});
 
-//builder.Services.Configure<FormOptions>(options =>
-//{
-//    options.ValueLengthLimit = int.MaxValue;
-//    options.MultipartBodyLengthLimit = int.MaxValue; // This is the limit for file uploads.
-//});
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+
+    options.Limits.MaxRequestBodySize = AppConstants.CHUNK_SIZE_2GB;
+});
+
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = AppConstants.CHUNK_SIZE_2GB;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = AppConstants.CHUNK_SIZE_2GB;
+});
 
 builder.Services.AddSingleton(services =>
 {
     return GrpcChannel.ForAddress(new Uri(AppConstants.GRPC_SERVER_URL), new GrpcChannelOptions()
     {
-        MaxSendMessageSize = int.MaxValue,
-        MaxReceiveMessageSize = int.MaxValue
+        MaxSendMessageSize = AppConstants.CHUNK_SIZE_2GB,
+        MaxReceiveMessageSize = AppConstants.CHUNK_SIZE_2GB
     });
 });
 

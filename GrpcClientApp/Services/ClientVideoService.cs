@@ -24,16 +24,23 @@ public class ClientVideoService
         var totalFileSize = (int)fileStream.Length;
         var totalChunks = (int)Math.Ceiling((double)totalFileSize / chunkSize);
         int lastChunkSize = (int)(totalFileSize % chunkSize);
-        byte[]? buffer = null ;
+        byte[]? buffer = null;
         var fileName = filePath.Split('\\').Last();
+
+        var offset = 0;
+        var countBtyesToRead = 0;
 
         using var call = _client.UploadChunk();
 
         for (var chunkNumber = 1; chunkNumber <= totalChunks; chunkNumber++)
         {
+            offset = (chunkNumber - 1) * chunkSize;
+            countBtyesToRead = chunkNumber == totalChunks ? lastChunkSize :  chunkSize;
+
             // Adjust buffer size for the last chunk
-            buffer = new byte[chunkNumber == totalChunks ? lastChunkSize : chunkSize];  
-            var bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+            buffer = new byte[chunkSize];
+            var bytesRead = await fileStream.ReadAsync(buffer);
+            //var bytesRead = await fileStream.ReadAsync(buffer, offset, countBtyesToRead);
             if (bytesRead == 0) break; // End of file
 
             var chunk = new ChunkRequest
